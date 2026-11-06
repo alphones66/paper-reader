@@ -1,5 +1,5 @@
-const CACHE = 'paper-pages-v2';
-const FILES = ['./', 'index.html', 'parse.js', 'pp-manifest.json', 'pp-icon-180.png', 'pp-icon-192.png', 'pp-icon-512.png'];
+const CACHE = 'paper-pages-v3';
+const FILES = ['./', 'index.html', 'parse.js', 'pp-manifest.json', 'pp-icon2-180.png', 'pp-icon2-192.png', 'pp-icon2-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES)));
