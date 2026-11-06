@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>考卷小幫手</title>
+  <link rel="manifest" href="pp-manifest.json">
+  <meta name="theme-color" content="#ffe8c2">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="考卷小幫手">
+  <link rel="apple-touch-icon" href="pp-icon-180.png">
+  <link rel="icon" href="pp-icon-192.png">
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; min-height: 100%; overflow-x: hidden; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif; color: var(--ink);
+      background: repeating-linear-gradient(90deg, #ffe8c2 0 60px, #fff1d6 60px 110px, #fbdca5 110px 130px, #fff1d6 130px 180px);
+      user-select: none; -webkit-user-select: none;
+      padding: calc(env(safe-area-inset-top) + 14px) 14px calc(env(safe-area-inset-bottom) + 14px);
+    }
+    button { font-family: inherit; cursor: pointer; }
+    ruby rt { font-size: .42em; color: #b8431f; font-weight: 600; }
+    body.nozy rt { display: none; }
+    .screen { display: none; flex-direction: column; align-items: center; gap: 14px; min-height: calc(100vh - 28px); padding-top: 68px; position: relative; }
+    .screen.active { display: flex; }
+    .round-btn { position: absolute; top: 0; left: 0; z-index: 5; width: 60px; height: 60px; border-radius: 50%; border: 4px solid #fff; background: var(--orange); color: #fff; font-size: 28px; box-shadow: 0 3px 8px rgba(0,0,0,.25); }
+    .zy-btn { position: absolute; top: 4px; right: 0; z-index: 5; border: 3px solid #fff; background: #fff; color: var(--red); font-size: 18px; font-weight: bold; border-radius: 999px; padding: 8px 16px; box-shadow: 0 3px 8px rgba(0,0,0,.2); }
+    h1 { margin: 0; font-size: clamp(30px, 5vw, 46px); color: #fff; background: var(--red); padding: 6px 26px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,.2); }
+    .ver { font-size: 13px; font-weight: 500; color: #ffe8d6; background: rgba(0,0,0,.18); border-radius: 9px; padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+    h2 { margin: 0; font-size: clamp(24px, 4vw, 36px); text-align: center; }
+    .sub { font-size: 18px; color: #7a5a3a; text-align: center; }
+    .big-btn { width: min(520px, 92vw); padding: 14px 16px; font-size: 26px; font-weight: bold; border: 5px solid var(--orange); border-radius: 20px; background: #fff3b8; color: #c2410c; box-shadow: 0 5px 0 #c8721a; }
+    .big-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #c8721a; }
+    .big-btn small { display: block; font-size: 16px; font-weight: normal; color: #8a6d3b; }
+    .big-btn.done { border-color: var(--ok); background: #e6f8dc; color: #2c7a2c; box-shadow: 0 5px 0 #2f8a2f; }
+
+    /* 書架 */
+    .shelf { width: min(1000px, 96vw); }
+    .shelf h3 { margin: 8px 4px; font-size: 22px; color: #a34a12; }
+    .books { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .book { background: #fff; border: 5px solid #f3c27a; border-radius: 22px; box-shadow: 0 4px 0 #d79a43; padding: 8px 10px 10px; text-align: center; font-family: inherit; color: var(--ink); }
+    .book:active { transform: translateY(3px); box-shadow: 0 1px 0 #d79a43; }
+    .book .cv { font-size: 60px; line-height: 1.15; }
+    .book .t { font-size: 24px; font-weight: bold; letter-spacing: 2px; }
+    .book .m { margin-top: 2px; font-size: 14px; color: #8a6d57; min-height: 18px; }
+    .lvbtn { display: block; margin: 8px 0 0 4px; border: 3px solid var(--orange); background: #fff; color: #c2410c; font-weight: bold; font-size: 17px; border-radius: 999px; padding: 6px 16px; }
+
+    /* 成語大標 */
+    .idiom-title { font-size: clamp(44px, 9vw, 72px); font-weight: bold; color: var(--red); letter-spacing: 6px; text-align: center; line-height: 1.7; }
+    .idiom-title ruby rt { font-size: .26em; letter-spacing: 0; }
+
+    /* 故事 */
+    .scene { container-type: inline-size; position: relative; width: min(900px, 96vw, max(320px, calc((100vh - 400px) * 16 / 9))); aspect-ratio: 16 / 9; border-radius: 26px; overflow: hidden; border: 6px solid #fff; box-shadow: 0 5px 14px rgba(0,0,0,.22); }
+    .bg-meadow { background: linear-gradient(#8fd3ff 0 60%, #a6e36a 60%); }
+    .bg-forest { background: linear-gradient(#cdeed4 0 52%, #5faf5f 52%); }
+    .bg-night { background: linear-gradient(#1b2a5a 0 62%, #2a3b78 62%); }
+    .bg-pond { background: linear-gradient(#bfe8ff 0 42%, #5bb8e8 42%); }
+    .bg-castle { background: linear-gradient(#e9dcff 0 60%, #b79be0 60%); }
+    .bg-room { background: linear-gradient(#ffe9c7 0 64%, #e0b27a 64%); }
+    .bg-city { background: linear-gradient(#bfe3ff 0 58%, #d9c9a8 58%); }
+    .bg-gold { background: linear-gradient(#fff3b0 0 60%, #ffd966 60%); }
+    .it { position: absolute; line-height: 1; transform-origin: 50% 80%; animation: popin .5s both; filter: drop-shadow(0 3px 2px rgba(0,0,0,.18)); }
+    .it.bounce { animation: popin .5s both, bounce .9s .5s infinite alternate ease-in-out; }
+    .it.sway { animation: popin .5s both, sway 1.6s .5s infinite alternate ease-in-out; }
+    .it.float { animation: popin .5s both, float 2.4s .5s infinite alternate ease-in-out; }
+    .it.run { animation: popin .5s both, run 1.3s .5s infinite alternate ease-in-out; }
+    .it.spin { animation: popin .5s both, spin 3s .5s infinite linear; }
+    @keyframes popin { from { transform: scale(.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-9%); } }
+    @keyframes sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+    @keyframes float { from { transform: translateY(0); } to { transform: translateY(-12%); } }
+    @keyframes run { from { transform: translateX(-14%); } to { transform: translateX(14%); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+    .sub-box { width: min(900px, 96vw); background: #fff; border: 5px solid #f3c27a; border-radius: 22px; padding: 12px 18px; font-size: clamp(24px, 4.2vw, 34px); line-height: 1.7; font-weight: 600; text-align: center; min-height: 96px; }
+    /* 卡拉OK：還沒唸的字是深色，唸過的字變橘紅色，正在唸的字有底色 */
+    .sub-box .c { transition: color .12s, background .12s; border-radius: 6px; }
+    .sub-box .c.done { color: var(--red); }
+    .sub-box .c.now { color: #fff; background: var(--red); }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .pill { border: 4px solid var(--orange); background: #fff3b8; color: #c2410c; font-size: 22px; font-weight: bold; border-radius: 999px; padding: 10px 22px; box-shadow: 0 4px 0 #c8721a; }
+    .pill:active { transform: translateY(3px); box-shadow: 0 1px 0 #c8721a; }
+    .pill.main { background: var(--orange); border-color: #fff; color: #fff; }
+    .pill[disabled] { opacity: .4; }
+    .dots { font-size: 20px; letter-spacing: 6px; color: var(--orange); }
+
+    .card { width: min(900px, 96vw); background: #fff; border: 5px solid #f3c27a; border-radius: 22px; padding: 12px 18px; }
+    .card h4 { margin: 0 0 6px; font-size: 24px; color: #a34a12; }
+    .card p, .card li { font-size: 20px; line-height: 1.7; margin: 4px 0; text-align: left; }
+    .say { border: 0; background: var(--orange); color: #fff; border-radius: 999px; min-width: 48px; height: 48px; font-size: 22px; flex: none; padding: 0 12px; }
+    .hz { font-size: clamp(22px, 3.6vw, 32px); line-height: 1.8; font-weight: 600; text-align: left; }
+    .hz .c { border-radius: 6px; transition: color .12s, background .12s; }
+    .hz .c.done { color: var(--red); }
+    .hz .c.now { color: #fff; background: var(--red); }
+    .pcard { display: flex; gap: 10px; align-items: center; width: min(900px, 96vw); background: #fff; border: 5px solid #f3c27a; border-radius: 22px; padding: 10px 14px; text-align: left; }
+    .pcard .info { flex: 1; }
+    .pcard .info b { font-size: 26px; color: #a34a12; }
+    .pcard .info div { font-size: 16px; color: #8a6d57; }
+    textarea { width: min(900px, 96vw); min-height: 240px; border: 5px solid #f3c27a; border-radius: 18px; padding: 12px 16px; font-size: 20px; line-height: 1.6; font-family: inherit; color: var(--ink); background: #fff; user-select: text; -webkit-user-select: text; }
+    textarea:focus { outline: none; border-color: var(--orange); }
+    .warn { width: min(900px, 96vw); background: #fff3e0; border: 3px dashed #f0a14b; border-radius: 14px; padding: 8px 14px; font-size: 18px; line-height: 1.6; text-align: left; }
+    .okbox { width: min(900px, 96vw); background: #e6f8dc; border: 3px solid var(--ok); border-radius: 14px; padding: 8px 14px; font-size: 20px; font-weight: bold; color: #2c7a2c; text-align: left; }
+    pre.fmt { white-space: pre-wrap; background: #fffbe8; border: 2px dashed #e8b762; border-radius: 12px; padding: 8px 12px; font-size: 17px; line-height: 1.6; margin: 6px 0; text-align: left; font-family: inherit; user-select: text; -webkit-user-select: text; }
+    .qhead { display: flex; align-items: center; gap: 10px; }
+    .qno { font-size: 22px; font-weight: bold; color: #fff; background: var(--red); border-radius: 999px; padding: 2px 16px; flex: none; }
+    .qrow { display: flex; gap: 10px; align-items: flex-start; margin-top: 6px; }
+    .orow { display: flex; gap: 10px; align-items: stretch; width: min(900px, 96vw); }
+    .opt { flex: 1; display: flex; align-items: center; gap: 12px; text-align: left; border: 5px solid #f3c27a; background: #fff; color: var(--ink); border-radius: 18px; padding: 10px 14px; box-shadow: 0 4px 0 #d79a43; }
+    .opt .k { width: 44px; height: 44px; border-radius: 50%; background: #fff3b8; border: 3px solid var(--orange); color: #c2410c; font-size: 24px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex: none; }
+    .opt .hz { font-size: clamp(22px, 3.4vw, 30px); }
+    .opt:active { transform: translateY(3px); }
+    .opt.bad { opacity: .35; animation: shake .35s; }
+    .opt.good { border-color: var(--ok); background: #e6f8dc; box-shadow: 0 4px 0 #2f8a2f; }
+    .opt.glow { animation: pulse .9s infinite; border-color: var(--ok); }
+    .opt.dim { opacity: .6; }
+    .orow .say { align-self: center; }
+    .msg { min-height: 36px; font-size: 26px; font-weight: bold; color: #2c7a2c; text-align: center; }
+    .msg.try { color: #b8631f; }
+    .exp { width: min(900px, 96vw); background: #fffbe8; border: 5px solid #f0c76a; border-radius: 22px; padding: 12px 16px; }
+    .exp h4 { margin: 0 0 6px; font-size: 24px; color: #a34a12; }
+    .bar { width: min(900px, 96vw); height: 14px; border-radius: 999px; background: #fff; border: 3px solid #f3c27a; overflow: hidden; }
+    .bar i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .3s; }
+    .stars { font-size: 56px; letter-spacing: 6px; }
+    .rv { width: min(900px, 96vw); background: #fff; border: 4px solid #f3c27a; border-radius: 18px; padding: 8px 14px; }
+    .rv .a { font-size: 20px; font-weight: bold; color: #2c7a2c; margin: 4px 0; }
+    .switch { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: bold; color: #7a3d00; }
+    .switch button { border: 3px solid var(--orange); background: #fff; border-radius: 999px; padding: 4px 14px; font-size: 18px; font-weight: bold; color: #c2410c; }
+  </style>
+</head>
+<body>
+
+<!-- 首頁：考卷清單 -->
+<div class="screen active" id="home">
+  <h1>📝 考卷小幫手 <span class="ver" id="ver"></span></h1>
+  <div class="sub">載入考卷，一題一題念給你聽，答完看說明 ✨</div>
+  <button class="big-btn" id="goImport">➕ 載入新考卷<small>貼上文字，或選一個文字檔</small></button>
+  <div id="plist" style="display:flex;flex-direction:column;gap:12px;align-items:center;width:100%"></div>
+</div>
+
+<!-- 載入考卷 -->
+<div class="screen" id="import">
+  <button class="round-btn" data-go="home">⬅️</button>
+  <h2>➕ 載入考卷</h2>
+  <div class="card">
+    <h4>1. 把考卷文字貼在下面，或選一個文字檔</h4>
+    <p>文字照下面的格式寫就行。考卷如果是照片或紙本，可以請 Claude、ChatGPT 之類的 AI 幫你轉成這個格式，再貼進來。</p>
+    <div class="row">
+      <button class="pill" id="impFile">📄 選文字檔</button>
+      <button class="pill" id="impSample">🧪 看範例</button>
+      <button class="pill" id="impPrompt">📋 複製「請 AI 轉換」的提示語</button>
+    </div>
+    <input type="file" id="impPick" accept=".txt,.md,text/plain" hidden>
+  </div>
+  <textarea id="impText" placeholder="在這裡貼上考卷文字…"></textarea>
+  <div class="row">
+    <button class="pill" id="impPreview">🔍 檢查一下</button>
+    <button class="pill" id="impSave" disabled>💾 存成考卷</button>
+  </div>
+  <div id="impMsg" style="display:flex;flex-direction:column;gap:8px;align-items:center;width:100%"></div>
+  <div class="card">
+    <h4>格式說明</h4>
+<pre class="fmt"># 三年級國語小考
+1. 「春天」的相反詞是什麼？
+A. 夏天
+B. 秋天
+C. 冬天
+D. 早上
+答案：C
+解析：春夏秋冬裡，和春天最不同的是冬天。
+
+2. 地球是圓的。
+答案：O
+解析：地球的形狀接近球形。</pre>
+    <p>· 選擇題：選項用 A. B. C. D.，也可以寫 ①②③④，或同一行 A.紅 B.黃 C.藍。<br>· 是非題：沒有選項，答案寫 O 或 X（○、×、對、錯也可以）。<br>· 答案和解析也可以集中放在最後面：<br>　答案：1.C 2.O<br>　詳解：<br>　1. 因為……<br>　2. 因為……</p>
+  </div>
+</div>
+
+<!-- 考卷主頁 -->
+<div class="screen" id="hub">
+  <button class="round-btn" data-go="home">⬅️</button>
+  <div class="idiom-title" id="hbTitle" style="font-size:clamp(30px,6vw,48px)"></div>
+  <div class="sub" id="hbSub"></div>
+  <div class="switch">朗讀題目：<button id="autoBtn"></button></div>
+  <div class="hub-btns" style="display:flex;flex-direction:column;gap:12px;align-items:center;width:100%">
+    <button class="big-btn" id="hbStart">▶ 開始作答<small>一題一題來</small></button>
+    <button class="big-btn" id="hbWrong">🔁 再練習答錯的題目<small id="hbWrongN"></small></button>
+    <button class="big-btn" id="hbAll">📖 看全部答案和說明<small>每一題都可以念給你聽</small></button>
+  </div>
+</div>
+
+<!-- 作答 -->
+<div class="screen" id="quiz">
+  <button class="round-btn" id="qBack">⬅️</button>
+  <div class="bar"><i id="qBar"></i></div>
+  <div class="card">
+    <div class="qhead"><span class="qno" id="qNo"></span><span class="sub" id="qCount"></span></div>
+    <div class="qrow"><button class="say" id="qSay">🔊</button><div class="hz kbox" id="qText"></div></div>
+  </div>
+  <div id="qOpts" style="display:flex;flex-direction:column;gap:12px;align-items:center;width:100%"></div>
+  <div class="msg" id="qMsg"></div>
+  <div class="exp" id="qExp" hidden>
+    <h4 id="qAns"></h4>
+    <div class="qrow"><button class="say" id="qExpSay">🔊</button><div class="hz kbox" id="qExpText"></div></div>
+  </div>
+  <div class="row">
+    <button class="pill" id="qShow">💡 看答案</button>
+    <button class="pill" id="qNext" hidden>下一題 ▶</button>
+  </div>
+</div>
+
+<!-- 結果 -->
+<div class="screen" id="result">
+  <h2>🎉 這份考卷完成了！</h2>
+  <div class="stars" id="rStars"></div>
+  <div class="msg" id="rMsg"></div>
+  <div class="row">
+    <button class="pill" id="rWrong">🔁 再練習答錯的</button>
+    <button class="pill" id="rAgain">▶ 再做一次</button>
+    <button class="pill" data-go="hub">📋 回考卷</button>
+  </div>
+</div>
+
+<!-- 全部答案與說明 -->
+<div class="screen" id="review">
+  <button class="round-btn" data-go="hub">⬅️</button>
+  <h2>📖 全部答案和說明</h2>
+  <div id="rvList" style="display:flex;flex-direction:column;gap:12px;align-items:center;width:100%"></div>
+</div>
+
+<script src="parse.js"></script>
+<script>
+const APP_VER = 'v2026.11.07-1';
+document.getElementById('ver').textContent = APP_VER;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
+};
+// ---------- 聲音 ----------
+let AC = null;
+function chime() {
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    [659, 784, 988].forEach((f, i) => {
+      const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime + i * .11;
+      o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.18, t + .02); g.gain.exponentialRampToValueAtTime(.001, t + .4);
+      o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + .45);
+    });
+  } catch (_) {}
+}
+const PRAISE = ['好棒！', '做得好！', '答對了！', '你好厲害！', '太棒了！'];
+const TRY = ['再試試看～', '沒關係，再看看～', '慢慢來，再試一次～'];
+
+let voice = null;
+function pickVoice() { const v = speechSynthesis.getVoices(); voice = v.find(x => /zh[-_]TW/i.test(x.lang)) || v.find(x => /^zh/i.test(x.lang)) || null; }
+if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+// ---------- 卡拉OK：字一個一個掃過 ----------
+let karTimer = null, karToken = 0;
+function karStop() { karToken++; clearInterval(karTimer); karTimer = null; if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+let karPos = 0;
+const PUNC = /[「」『』“”‘’"'（）()《》〈〉【】—─…，。！？；：、,.!?;:~～]/;
+// 唸出聲的文字：拿掉標點和引號（字幕還是照原來的字掃），並記下每個字對應字幕的第幾個字
+function spoken(t) { let out = '', map = []; Array.from(t).forEach((c, i) => { if (!PUNC.test(c)) { out += c; map.push(i); } }); return { out, map }; }
+function karShow(box, n) { karPos = n; box.querySelectorAll('.c').forEach((w, i) => { w.classList.toggle('done', i < n); w.classList.toggle('now', i === n); }); }
+let msPerChar = 300;   // 每個字大約唸幾毫秒：每唸完一句就用實際時間修正
+function karSay(text, box, onEnd, from = 0) {   // 一個分句一個分句唸；每句唸完字幕就對齊句尾，不會越差越多
+  karStop();
+  const my = karToken, cs = box ? [...box.querySelectorAll('.c')] : [];
+  const clauses = (text.match(/[^，。！？；：、]+[，。！？；：、]*/g) || [text]).map(t => Array.from(t).length);
+  let ci = 0, base = 0;
+  const finish = () => { if (my !== karToken) return; clearInterval(karTimer); if (box) karShow(box, 999); if (onEnd) onEnd(); };
+  if (!('speechSynthesis' in window)) { box ? fakeAll() : finish(); return; }
+  const clauseText = [], arr = Array.from(text); let pos = 0;
+  clauses.forEach(n => { clauseText.push(arr.slice(pos, pos + n).join('')); pos += n; });
+  while (ci < clauses.length && base + clauses[ci] <= from) { base += clauses[ci]; ci++; }   // 從暫停的那一句開頭接著唸
+  next();
+  function next() {
+    if (my !== karToken) return;
+    if (ci >= clauses.length) { finish(); return; }
+    const n = clauses[ci], start = base, t = clauseText[ci];
+    let gotB = false, t0 = 0;
+    if (box) karShow(box, start);
+    const sp = spoken(t); if (!sp.out) { base = start + n; ci++; next(); return; }
+    const u = new SpeechSynthesisUtterance(sp.out); u.lang = 'zh-TW'; u.rate = .72; u.pitch = 1.1; if (voice) u.voice = voice;
+    u.onstart = () => {
+      t0 = performance.now(); clearInterval(karTimer);
+      if (!box) return;
+      karTimer = setInterval(() => {   // 語音沒回報位置時，照預估速度掃，但不會超過這一句的最後一個字
+        if (my !== karToken) { clearInterval(karTimer); return; }
+        if (gotB) return;
+        const k = Math.min(n - 1, Math.floor((performance.now() - t0) / msPerChar));
+        karShow(box, start + k);
+      }, 50);
+    };
+    u.onboundary = e => { if (my !== karToken || !box) return; gotB = true; karShow(box, start + Math.min(n - 1, sp.map[Math.min(sp.map.length - 1, e.charIndex)] || 0)); };
+    const done = () => {
+      if (my !== karToken) return;
+      clearInterval(karTimer);
+      if (t0) { const per = (performance.now() - t0) / n; if (per > 80 && per < 900) msPerChar = msPerChar * .5 + per * .5; }
+      base = start + n; ci++; next();
+    };
+    u.onend = done; u.onerror = done;
+    speechSynthesis.speak(u);
+  }
+  function fakeAll() {
+    const t0 = performance.now(), total = arr.length * msPerChar;
+    karTimer = setInterval(() => { const f = (performance.now() - t0) / total; karShow(box, Math.min(cs.length, Math.floor(f * cs.length))); if (f >= 1) finish(); }, 60);
+  }
+}
+const sayPlain = t => { karStop(); if (!('speechSynthesis' in window)) return; const u = new SpeechSynthesisUtterance(spoken(t).out); u.lang = 'zh-TW'; u.rate = .8; if (voice) u.voice = voice; speechSynthesis.speak(u); };
+const kChars = t => Array.from(t).map(c => `<span class="c">${esc(c)}</span>`).join('');
+
+// ---------- 讀出來：按一下開始，再按暫停，再按從那一句接著讀 ----------
+let rd = { btn: null, st: '', pos: 0 };
+function rdReset() { karStop(); if (rd.btn) rd.btn.textContent = '🔊'; rd = { btn: null, st: '', pos: 0 }; }
+function rdToggle(btn, box, after) {
+  const text = Array.from(box.querySelectorAll('.c')).map(c => c.textContent).join('');
+  if (!text) return;
+  if (rd.btn === btn && rd.st === 'play') { const p = karPos; karStop(); rd.pos = p; rd.st = 'pause'; btn.textContent = '▶'; return; }
+  const from = (rd.btn === btn && rd.st === 'pause') ? rd.pos : 0;
+  if (rd.btn !== btn) { const ob = rd.btn && rd.btn._box; rdReset(); if (ob) karShow(ob, -1); } else karStop();
+  rd = { btn, st: 'play', pos: from }; btn._box = box; btn.textContent = '⏸';
+  karSay(text, box, () => { btn.textContent = '🔊'; rd = { btn: null, st: '', pos: 0 }; if (after) after(); }, from);
+}
+const _karShow = karShow;
+karShow = function (box, n) { _karShow(box, n); const el = box.querySelectorAll('.c')[n]; if (el && el.scrollIntoView) { try { el.scrollIntoView({ block: 'nearest' }); } catch (_) {} } };
+const praise = () => { chime(); return pick(PRAISE); };
+
+// ---------- 考卷資料 ----------
+const papers = () => store.get('ppPapers', []);
+const progAll = () => store.get('ppProg', {});
+const progOf = id => progAll()[id] || { wrong: [], best: 0, tries: 0 };
+function setProg(id, p) { const a = progAll(); a[id] = p; store.set('ppProg', a); }
+let paper = null;
+const autoRead = () => store.get('ppAuto', true);
+
+// ---------- 畫面切換 ----------
+function show(id) {
+  rdReset(); karStop();
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+  window.scrollTo(0, 0);
+  if (id === 'home') renderHome();
+  if (id === 'hub') renderHub();
+}
+document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) show(g.dataset.go); });
+document.addEventListener('click', e => {
+  const b = e.target.closest('.say[data-box]'); if (!b) return;
+  const box = document.getElementById(b.dataset.box); if (box) rdToggle(b, box);
+});
+
+// ---------- 首頁 ----------
+function renderHome() {
+  const ps = papers();
+  $('plist').innerHTML = ps.length ? ps.map(p => {
+    const g = progOf(p.id);
+    return `<div class="pcard"><div class="info"><b>${esc(p.title)}</b><div>${esc(p.subject || '')} 共 ${p.qs.length} 題${g.tries ? '　⭐'.repeat(Math.min(3, Math.ceil(g.best / p.qs.length * 3))) : ''}</div></div>
+      <button class="pill" data-open="${p.id}">開啟</button><button class="pill" data-del="${p.id}" style="font-size:16px">🗑</button></div>`;
+  }).join('') : '<div class="sub">還沒有考卷。按上面的「載入新考卷」開始吧！</div>';
+}
+$('plist').onclick = e => {
+  const o = e.target.closest('[data-open]'), d = e.target.closest('[data-del]');
+  if (o) { paper = papers().find(p => p.id === o.dataset.open); show('hub'); }
+  if (d) {
+    if (d.dataset.sure) { store.set('ppPapers', papers().filter(p => p.id !== d.dataset.del)); renderHome(); }
+    else { d.dataset.sure = 1; d.textContent = '再按一次刪除'; setTimeout(() => { d.dataset.sure = ''; d.textContent = '🗑'; }, 3000); }
+  }
+};
+$('goImport').onclick = () => { $('impText').value = ''; $('impMsg').innerHTML = ''; $('impSave').disabled = true; show('import'); };
+
+// ---------- 載入考卷 ----------
+const SAMPLE = `# 範例：三年級國語小考
+科目：國語
+1. 「春天」的相反詞是什麼？
+A. 夏天
+B. 秋天
+C. 冬天
+D. 早上
+答案：C
+解析：春夏秋冬裡，和春天最不同的是冬天，所以春天的相反是冬天。
+
+2. 下面哪一個詞語寫對了？
+A. 已經
+B. 己經
+C. 以經
+D. 已徑
+答案：A
+解析：「已經」的「已」，下面是封起來的。
+
+3. 太陽從東邊出來。
+答案：O
+解析：太陽每天從東邊升起，從西邊落下。
+
+4. 3 + 4 = ？
+①6 ②7 ③8 ④9
+答案：②
+解析：3 加 4 等於 7。`;
+const PROMPT = `請把這份考卷整理成下面的純文字格式（不要表格、不要多餘的說明）：
+第一行：# 考卷標題
+每一題：先寫題號和題目，選項用 A. B. C. D. 各一行；是非題沒有選項。
+接著寫「答案：」（選擇題寫字母，是非題寫 O 或 X），再寫「解析：」（用小朋友聽得懂的話，一兩句說明為什麼）。
+如果考卷沒有附答案，請你解題並寫出答案和解析。
+題目裡有圖的，請用文字描述圖片，放在題目後面。`;
+let parsed = null;
+$('impSample').onclick = () => { $('impText').value = SAMPLE; $('impPreview').click(); };
+$('impFile').onclick = () => $('impPick').click();
+$('impPick').onchange = () => { const f = $('impPick').files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { $('impText').value = String(r.result); $('impPreview').click(); }; r.readAsText(f, 'utf-8'); };
+$('impPrompt').onclick = () => { try { navigator.clipboard.writeText(PROMPT); $('impPrompt').textContent = '✓ 已複製'; setTimeout(() => { $('impPrompt').textContent = '📋 複製「請 AI 轉換」的提示語'; }, 2500); } catch (_) { $('impText').value = PROMPT; } };
+$('impPreview').onclick = () => {
+  parsed = parsePaper($('impText').value);
+  const w = parsed.warn, box = $('impMsg');
+  if (!parsed.qs.length) { box.innerHTML = '<div class="warn">我沒有找到題目。請確認每一題前面有題號，例如「1.」。</div>'; $('impSave').disabled = true; return; }
+  const noExp = parsed.qs.filter(q => !q.exp).length;
+  box.innerHTML = `<div class="okbox">找到「${esc(parsed.title)}」，共 ${parsed.qs.length} 題。${noExp ? `（有 ${noExp} 題沒有解析）` : ''}</div>` +
+    (w.length ? `<div class="warn">請注意：<br>${w.slice(0, 8).map(esc).join('<br>')}${w.length > 8 ? '<br>……' : ''}<br>沒有答案的題目，作答時只能念題目，不會判斷對錯。</div>` : '') +
+    `<div class="card"><h4>第 1 題預覽</h4><p>${esc(parsed.qs[0].q)}</p>${parsed.qs[0].opts.map(o => `<p>${esc(o.k)}. ${esc(o.t)}</p>`).join('')}<p>答案：${esc(parsed.qs[0].ans || '（沒有）')}</p></div>`;
+  $('impSave').disabled = false;
+};
+$('impSave').onclick = () => {
+  if (!parsed || !parsed.qs.length) return;
+  const p = { id: 'p' + Date.now(), title: parsed.title, subject: parsed.subject, qs: parsed.qs, created: Date.now() };
+  store.set('ppPapers', [p, ...papers()]); chime(); paper = p; show('hub');
+};
+
+// ---------- 考卷主頁 ----------
+function renderHub() {
+  const g = progOf(paper.id);
+  $('hbTitle').textContent = paper.title;
+  $('hbSub').textContent = `${paper.subject ? paper.subject + '　' : ''}共 ${paper.qs.length} 題${g.tries ? '　上次答對 ' + g.last + ' 題' : ''}`;
+  $('autoBtn').textContent = autoRead() ? '開：進到題目就念' : '關：按喇叭才念';
+  const w = g.wrong.length;
+  $('hbWrong').style.display = w ? '' : 'none'; $('hbWrongN').textContent = w ? `有 ${w} 題可以再練習` : '';
+}
+$('autoBtn').onclick = () => { store.set('ppAuto', !autoRead()); renderHub(); };
+$('hbStart').onclick = () => startQuiz(paper.qs, false);
+$('hbWrong').onclick = () => startQuiz(paper.qs.filter(q => progOf(paper.id).wrong.includes(q.n)), true);
+$('hbAll').onclick = () => { renderReview(); show('review'); };
+
+// ---------- 作答（不扣分：選錯就再想想，兩次以後正確答案會發亮）----------
+let Q = [], qi = 0, miss = 0, firstTry = 0, wrongSet = new Set(), answered = false, partial = false;
+function startQuiz(list, isPartial) { Q = list; qi = 0; firstTry = 0; wrongSet = new Set(); partial = isPartial; show('quiz'); showQ(); }
+const ansLabel = q => q.ans ? (q.ans.length > 1 ? q.ans.split('').join('、') : q.ans) : '';
+function showQ() {
+  const q = Q[qi]; miss = 0; answered = false; rdReset();
+  $('qBar').style.width = (qi / Q.length * 100) + '%';
+  $('qNo').textContent = '第 ' + q.n + ' 題'; $('qCount').textContent = `（${qi + 1} / ${Q.length}）`;
+  $('qText').innerHTML = kChars(q.q);
+  $('qSay').dataset.box = 'qText'; $('qSay').textContent = '🔊';
+  $('qOpts').innerHTML = q.opts.map((o, i) => `<div class="orow"><button class="say" data-box="o${i}">🔊</button><button class="opt" data-k="${esc(o.k)}"><span class="k">${o.k === 'O' ? '○' : o.k === 'X' ? '✕' : esc(o.k)}</span><span class="hz kbox" id="o${i}">${kChars(o.t)}</span></button></div>`).join('');
+  $('qMsg').textContent = ''; $('qMsg').className = 'msg';
+  $('qExp').hidden = true; $('qNext').hidden = true; $('qShow').hidden = false;
+  $('qNext').textContent = qi === Q.length - 1 ? '完成 ✔' : '下一題 ▶';
+  if (autoRead()) setTimeout(() => { if (Q[qi] === q && !answered) rdToggle($('qSay'), $('qText')); }, 250);
+}
+$('qSay').onclick = () => rdToggle($('qSay'), $('qText'));
+function reveal(q) {
+  answered = true; $('qShow').hidden = true; $('qNext').hidden = false;
+  document.querySelectorAll('#qOpts .opt').forEach(b => { b.classList.remove('glow'); if (q.ans.includes(b.dataset.k)) b.classList.add('good'); else b.classList.add('dim'); });
+  $('qAns').textContent = q.ans ? '✅ 答案：' + ansLabel(q) : '這份考卷沒有提供這題的答案';
+  $('qExp').hidden = false;
+  $('qExpText').innerHTML = kChars(q.exp || (q.ans ? '（這一題沒有寫解析）' : ''));
+  $('qExpSay').dataset.box = 'qExpText'; $('qExpSay').textContent = '🔊';
+  $('qExp').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+$('qExpSay').onclick = () => rdToggle($('qExpSay'), $('qExpText'));
+$('qOpts').onclick = e => {
+  const sy = e.target.closest('.say'); if (sy) { rdToggle(sy, document.getElementById(sy.dataset.box)); return; }
+  const b = e.target.closest('.opt'); if (!b || answered) return;
+  const q = Q[qi];
+  if (!q.ans) { $('qMsg').textContent = '你選了 ' + b.dataset.k + '。這題沒有答案，我們看下一題吧！'; answered = true; $('qNext').hidden = false; $('qShow').hidden = true; return; }
+  if (q.ans.includes(b.dataset.k)) {
+    if (!miss) firstTry++; else wrongSet.add(q.n);
+    $('qMsg').textContent = praise() + (miss ? ' 你想通了！' : ''); $('qMsg').className = 'msg';
+    reveal(q);
+    if (autoRead() && q.exp) setTimeout(() => rdToggle($('qExpSay'), $('qExpText')), 400);
+  } else {
+    miss++; wrongSet.add(q.n); b.classList.add('bad');
+    $('qMsg').textContent = pick(TRY); $('qMsg').className = 'msg try';
+    if (miss >= 2) document.querySelectorAll('#qOpts .opt').forEach(x => { if (q.ans.includes(x.dataset.k)) x.classList.add('glow'); });
+  }
+};
+$('qShow').onclick = () => { const q = Q[qi]; wrongSet.add(q.n); reveal(q); $('qMsg').textContent = '看看答案和說明，下次就會了！'; $('qMsg').className = 'msg'; };
+$('qNext').onclick = () => { if (qi < Q.length - 1) { qi++; showQ(); } else finish(); };
+$('qBack').onclick = () => show('hub');
+function finish() {
+  const g = progOf(paper.id), total = Q.length, ok = firstTry;
+  let wrong = new Set(g.wrong);
+  Q.forEach(q => { if (wrongSet.has(q.n)) wrong.add(q.n); else wrong.delete(q.n); });
+  setProg(paper.id, { wrong: [...wrong], best: Math.max(g.best || 0, partial ? 0 : ok), tries: (g.tries || 0) + 1, last: ok });
+  const star = ok / total >= .9 ? 3 : ok / total >= .6 ? 2 : 1;
+  $('rStars').textContent = '⭐'.repeat(star);
+  $('rMsg').textContent = `${praise()} 你第一次就答對 ${ok} 題（共 ${total} 題）。${wrong.size ? ' 沒有答對的題目，可以再練習一次！' : ' 全部都會了！'}`;
+  $('rWrong').style.display = wrong.size ? '' : 'none';
+  show('result');
+}
+$('rWrong').onclick = () => $('hbWrong').click();
+$('rAgain').onclick = () => $('hbStart').click();
+
+// ---------- 全部答案與說明 ----------
+function renderReview() {
+  $('rvList').innerHTML = paper.qs.map((q, i) => `<div class="rv"><div class="qhead"><span class="qno">第 ${q.n} 題</span></div>
+    <div class="qrow"><button class="say" data-box="rq${i}">🔊</button><div class="hz kbox" id="rq${i}">${kChars(q.q)}</div></div>
+    ${q.opts.map(o => `<p style="margin:2px 0;font-size:20px">${esc(o.k === 'O' ? '○' : o.k === 'X' ? '✕' : o.k)}. ${esc(o.t)}</p>`).join('')}
+    <div class="a">${q.ans ? '✅ 答案：' + esc(ansLabel(q)) : '（沒有答案）'}</div>
+    ${q.exp ? `<div class="qrow"><button class="say" data-box="re${i}">🔊</button><div class="hz kbox" id="re${i}">${kChars(q.exp)}</div></div>` : ''}</div>`).join('');
+}
+
+// ---------- 離線 ----------
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+renderHome();
+</script>
+</body>
+</html>
