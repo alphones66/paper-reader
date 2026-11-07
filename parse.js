@@ -23,7 +23,7 @@ function normAns(a) {
 
 function parsePaper(raw) {
   const lines = FW(String(raw || '')).split(/\r?\n/);
-  const paper = { title: '', subject: '', qs: [], warn: [] };
+  const paper = { title: '', subject: '', audio: '', qs: [], warn: [] };
   let q = null, mode = '', globalExp = false, gcur;
   const keys = {}, exps = {};
   const push = () => { if (q) { q.q = q.q.trim(); q.exp = (q.exp || '').trim(); paper.qs.push(q); } q = null; };
@@ -35,6 +35,7 @@ function parsePaper(raw) {
     if (!t) { continue; }
     let m;
     if ((m = t.match(/^#\s*(.+)$/)) || (m = t.match(/^(?:標題|考卷|試卷)\s*[:：]\s*(.+)$/))) { if (!paper.title) paper.title = m[1].trim(); continue; }
+    if ((m = t.match(/^音檔\s*[:：]\s*(\S+)\s*$/))) { paper.audio = m[1]; continue; }   // 聽力考卷的音檔檔名
     if ((m = t.match(/^(?:科目|年級|範圍)\s*[:：]\s*(.+)$/))) { paper.subject = (paper.subject ? paper.subject + ' ' : '') + m[1].trim(); continue; }
     // 集中放在後面的答案：「答案：1.B 2.C 3.A」
     if ((m = t.match(RE_ANS))) {
@@ -77,6 +78,7 @@ function parsePaper(raw) {
   }
   push();
   paper.qs.forEach(x => {
+    x.listen = /^【聽力/.test(x.q);   // 聽力題：要先聽音檔，題目文字不顯示
     if (keys[x.n] && !x.ans) x.ans = keys[x.n];
     if (exps[x.n] && !x.exp) x.exp = exps[x.n];
     if (x.q.match(/[(（]\s*[)）]/) === null) x.q = x.q;

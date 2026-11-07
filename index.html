@@ -94,6 +94,8 @@
     .card p, .card li { font-size: 20px; line-height: 1.7; margin: 4px 0; text-align: left; }
     .say { border: 0; background: var(--orange); color: #fff; border-radius: 999px; min-width: 48px; height: 48px; font-size: 22px; flex: none; padding: 0 12px; }
     .hz { font-size: clamp(22px, 3.6vw, 32px); line-height: 1.8; font-weight: 600; text-align: left; }
+    .audbar { width: min(900px, 96vw); background: #fff; border: 5px solid #5aa9e6; border-radius: 22px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; font-weight: bold; color: #1f6fb5; font-size: 20px; }
+    .audbar audio { flex: 1; min-width: 0; height: 44px; }
     .hz .c { border-radius: 6px; transition: color .12s, background .12s; }
     .hz .c.done { color: var(--red); }
     .hz .c.now { color: #fff; background: var(--red); }
@@ -198,6 +200,7 @@ D. 早上
 <div class="screen" id="quiz">
   <button class="round-btn" id="qBack">⬅️</button>
   <div class="bar"><i id="qBar"></i></div>
+  <div class="audbar" id="audBar" hidden><span>🎧 聽力</span><audio id="aud" controls preload="metadata" playsinline></audio></div>
   <div class="card">
     <div class="qhead"><span class="qno" id="qNo"></span><span class="sub" id="qCount"></span></div>
     <div class="qrow"><button class="say" id="qSay">🔊</button><div class="hz kbox" id="qText"></div></div>
@@ -235,7 +238,7 @@ D. 早上
 
 <script src="parse.js"></script>
 <script>
-const APP_VER = 'v2026.11.07-7';
+const APP_VER = 'v2026.11.07-8';
 document.getElementById('ver').textContent = APP_VER;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -407,7 +410,7 @@ const autoRead = () => store.get('ppAuto', true);
 
 // ---------- 畫面切換 ----------
 function show(id) {
-  rdReset(); karStop();
+  rdReset(); karStop(); if (id !== 'quiz') { try { $('aud').pause(); } catch (_) {} }
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
   window.scrollTo(0, 0);
   if (id === 'home') renderHome();
@@ -445,20 +448,20 @@ function renderCloud() {
   const have = new Set(papers().map(p => p.cid).filter(Boolean));
   box.innerHTML = cloudList.length ? '<div class="sub">☁️ 雲端考卷</div>' + cloudList.map(c =>
     `<div class="pcard"><div class="info"><b>${esc(c.title)}</b><div>${esc(c.note || '')}${have.has(c.file) ? '　✅ 已載入' : ''}</div></div>
-      <button class="pill" data-cloud="${esc(c.file)}">${have.has(c.file) ? '開啟' : '☁️ 載入'}</button></div>`).join('') : '';
+      <button class="pill" data-cloud="${esc(c.file)}">${!have.has(c.file) ? '☁️ 載入' : (papers().find(p => p.cid === c.file).cv || 1) < (c.v || 1) ? '🔄 更新' : '開啟'}</button></div>`).join('') : '';
 }
 $('cloudBox').onclick = async e => {
   const b = e.target.closest('[data-cloud]'); if (!b) return;
-  const file = b.dataset.cloud, have = papers().find(p => p.cid === file);
-  if (have) { paper = have; show('hub'); return; }
+  const file = b.dataset.cloud, c = cloudList.find(x => x.file === file) || {}, have = papers().find(p => p.cid === file);
+  if (have && (have.cv || 1) >= (c.v || 1)) { paper = have; show('hub'); return; }   // 已載入而且是最新的就直接開；雲端有新版就更新
   b.disabled = true; b.textContent = '載入中…';
   try {
     const r = await fetch('papers/' + encodeURIComponent(file), { cache: 'no-cache', credentials: 'same-origin' });
     if (!r.ok) throw new Error(r.status);
     const parsed = parsePaper(await r.text());
     if (!parsed.qs.length) throw new Error('empty');
-    const p = { id: 'p' + Date.now(), cid: file, title: parsed.title, subject: parsed.subject, qs: parsed.qs, created: Date.now() };
-    store.set('ppPapers', [p, ...papers()]); chime(); paper = p; show('hub');
+    const p = { id: have ? have.id : 'p' + Date.now(), cid: file, cv: c.v || 1, title: parsed.title, subject: parsed.subject, audio: parsed.audio, qs: parsed.qs, created: Date.now() };
+    store.set('ppPapers', have ? papers().map(x => x.id === have.id ? p : x) : [p, ...papers()]); chime(); paper = p; show('hub');
   } catch (_) { b.disabled = false; b.textContent = '☁️ 載入'; alert('載入失敗，請確認有登入、網路正常，再按一次。'); }
 };
 loadCloud();
@@ -522,7 +525,7 @@ $('impPreview').onclick = () => {
 };
 $('impSave').onclick = () => {
   if (!parsed || !parsed.qs.length) return;
-  const p = { id: 'p' + Date.now(), title: parsed.title, subject: parsed.subject, qs: parsed.qs, created: Date.now() };
+  const p = { id: 'p' + Date.now(), title: parsed.title, subject: parsed.subject, audio: parsed.audio, qs: parsed.qs, created: Date.now() };
   store.set('ppPapers', [p, ...papers()]); chime(); paper = p; show('hub');
 };
 
@@ -546,6 +549,10 @@ function startQuiz(list, isPartial) { Q = list; qi = 0; firstTry = 0; wrongSet =
 const ansLabel = q => q.ans ? (q.ans.length > 1 ? q.ans.split('').join('、') : q.ans) : '';
 function showQ() {
   const q = Q[qi]; miss = 0; answered = false; rdReset();
+  const au = $('aud'), hasAud = !!(paper.audio && q.listen);
+  $('audBar').hidden = !hasAud;
+  if (hasAud) { if (au.dataset.f !== paper.audio) { au.dataset.f = paper.audio; au.src = 'papers/' + encodeURIComponent(paper.audio); } }
+  else { try { au.pause(); } catch (_) {} }
   $('qBar').style.width = (qi / Q.length * 100) + '%';
   $('qNo').textContent = '第 ' + q.n + ' 題'; $('qCount').textContent = `（${qi + 1} / ${Q.length}）`;
   $('qText').innerHTML = kChars(q.q);
@@ -554,7 +561,7 @@ function showQ() {
   $('qMsg').textContent = ''; $('qMsg').className = 'msg';
   $('qExp').hidden = true; $('qNext').hidden = true; $('qShow').hidden = false;
   $('qNext').textContent = qi === Q.length - 1 ? '完成 ✔' : '下一題 ▶';
-  if (autoRead()) setTimeout(() => { if (Q[qi] === q && !answered) rdToggle($('qSay'), $('qText')); }, 250);
+  if (autoRead() && !q.listen) setTimeout(() => { if (Q[qi] === q && !answered) rdToggle($('qSay'), $('qText')); }, 250);   // 聽力題不自動念，免得蓋過音檔
 }
 $('qSay').onclick = () => rdToggle($('qSay'), $('qText'));
 function reveal(q) {
@@ -576,7 +583,7 @@ $('qOpts').onclick = e => {
     if (!miss) firstTry++; else wrongSet.add(q.n);
     $('qMsg').textContent = praise() + (miss ? ' 你想通了！' : ''); $('qMsg').className = 'msg';
     reveal(q);
-    if (autoRead() && q.exp) setTimeout(() => rdToggle($('qExpSay'), $('qExpText')), 400);
+    if (autoRead() && q.exp && !q.listen) setTimeout(() => rdToggle($('qExpSay'), $('qExpText')), 400);
   } else {
     miss++; wrongSet.add(q.n); b.classList.add('bad');
     $('qMsg').textContent = pick(TRY); $('qMsg').className = 'msg try';
