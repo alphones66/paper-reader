@@ -161,7 +161,7 @@ D. 早上
 
 <script src="parse.js"></script>
 <script>
-const APP_VER = 'v2026.11.07-6';
+const APP_VER = 'v2026.11.07-7';
 document.getElementById('ver').textContent = APP_VER;
 {{JS}}
 
@@ -173,6 +173,8 @@ const SPK = [
   [/(cm|m)([²³])/y, m => (m[2] === '²' ? '平方' : '立方') + UNIT[m[1]]],
   [/(\d+(?:\.\d+)?)\s*%/y, m => '百分之' + m[1]],
   [/(\d+)\s*[:：]\s*(\d+)/y, m => m[1] + '比' + m[2]],
+  [/(\d+|[A-Za-z])\/\(([^)]*)\)/y, m => spoken(m[2]).out + '分之' + m[1]],   // 15/(x−2)
+  [/\(([^)]*)\)\/(\d+|[A-Za-z])/y, m => m[2] + '分之' + spoken(m[1]).out],   // (x−1)/2
   [/(\d+|[A-Za-z])\/(\d+|[A-Za-z])/y, m => m[2] + '分之' + m[1]],
   [/\d+(?:\.\d+)?/y, m => m[0]],
   [/(mm|cm|km|kg|mL|ml|μm|nm)(?![A-Za-z])/y, m => UNIT[m[1]], 'unit'],
@@ -181,21 +183,22 @@ const SPK = [
   [/√/y, () => '根號'], [/²/y, () => '平方'], [/³/y, () => '立方'],
   [/[＝=]/y, () => '等於'], [/≥/y, () => '大於等於'], [/≤/y, () => '小於等於'], [/[＞>]/y, () => '大於'], [/[＜<]/y, () => '小於'],
   [/×/y, () => '乘'], [/÷/y, () => '除以'], [/[＋+]/y, () => '加'], [/±/y, () => '正負'],
-  [/[−－]/y, (m, prev, prevNs) => /[\d)A-Za-z²³]/.test(prevNs) ? '減' : '負'],
+  [/[−－]/y, (m, prev, prevNs, st) => (prevNs === '|' ? !st.abs : /[\d)A-Za-z²³]/.test(prevNs)) ? '減' : '負'],   // 絕對值剛結束後的減號是「減」，剛開始後的是「負」
   [/[~～]/y, (m, prev, prevNs) => /\d/.test(prevNs) ? '到' : ''],
   [/[①②③④⑤⑥⑦⑧⑨]/y, m => '一二三四五六七八九'['①②③④⑤⑥⑦⑧⑨'.indexOf(m[0])]],
-  [/[|｜／/]/y, () => ''],
+  [/[|｜]/y, (m, prev, prevNs, st) => (st.abs = !st.abs) ? '絕對值' : '，'],   // 絕對值的兩條豎線：前一條念「絕對值」，後一條停一下
+  [/[／/]/y, () => ''],
 ];
 // 回傳要唸的字，以及「每個唸出來的字」對應字幕的第幾個字（卡拉 OK 掃字用）
 function spoken(t) {
-  const out = [], map = []; let p = 0, di = 0, prev = '', prevNs = '';
+  const out = [], map = [], st = { abs: false }; let p = 0, di = 0, prev = '', prevNs = '';
   while (p < t.length) {
     let hit = null;
     for (const [re, fn, kind] of SPK) {
       if (kind === 'unit' && /[A-Za-z]/.test(prev)) continue;
       if (kind === 'unit1' && !/\d/.test(prevNs)) continue;
       re.lastIndex = p; const m = re.exec(t);
-      if (m) { hit = [m, fn(m, prev, prevNs)]; break; }
+      if (m) { hit = [m, fn(m, prev, prevNs, st)]; break; }
     }
     if (hit) {
       const [m, str] = hit, len = Array.from(m[0]).length;
@@ -204,6 +207,7 @@ function spoken(t) {
       continue;
     }
     const c = String.fromCodePoint(t.codePointAt(p));
+    if (/[」』。；]/.test(c)) st.abs = false;   // 句子結束，絕對值的豎線配對重來
     if (!PUNC.test(c)) { out.push(c); map.push(di); }
     p += c.length; di++; prev = c; if (!/\s/.test(c)) prevNs = c;
   }
