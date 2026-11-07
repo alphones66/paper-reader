@@ -13,6 +13,7 @@
   <link rel="apple-touch-icon" href="pp-icon2-180.png">
   <link rel="icon" href="pp-icon2-192.png">
   <style>
+    :root { --ink: #3b2f2f; --red: #d9482b; --orange: #f08a24; --ok: #3ba53b; --cream: #fff6dc; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; min-height: 100%; overflow-x: hidden; }
     body {
@@ -234,7 +235,7 @@ D. 早上
 
 <script src="parse.js"></script>
 <script>
-const APP_VER = 'v2026.11.07-4';
+const APP_VER = 'v2026.11.07-5';
 document.getElementById('ver').textContent = APP_VER;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
