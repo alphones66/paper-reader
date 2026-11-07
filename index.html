@@ -242,7 +242,7 @@ D. 早上
 
 <script src="parse.js"></script>
 <script>
-const APP_VER = 'v2026.11.08-2';
+const APP_VER = 'v2026.11.08-3';
 document.getElementById('ver').textContent = APP_VER;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -692,17 +692,17 @@ karSay = function (text, box, onEnd, from = 0) {
     if (!('speechSynthesis' in window)) { finish(); return; }
     const sp = spoken(arr.slice(from).join(''));
     if (!sp.out) { finish(); return; }
-    let gotB = false, t0 = performance.now();
+    let lastB = 0, t0 = performance.now();
     const show = k => { if (box) karShow(box, from + Math.max(0, Math.min(total - 1, k))); };
     show(0);
     clearInterval(karTimer);
     karTimer = setInterval(() => {
       if (my !== karToken) { clearInterval(karTimer); return; }
-      if (!gotB) show(Math.floor((performance.now() - t0) / msPerChar));
+      if (performance.now() - lastB > 900) show(Math.floor((performance.now() - t0) / msPerChar));
     }, 80);
     const u = new SpeechSynthesisUtterance(sp.out); u.lang = 'zh-TW'; u.rate = .72; u.pitch = 1.1; if (voice) u.voice = voice;
     u.onstart = () => { t0 = performance.now(); };
-    u.onboundary = e => { if (my !== karToken) return; gotB = true; show(sp.map[Math.min(sp.map.length - 1, e.charIndex || 0)] || 0); };
+    u.onboundary = e => { if (my !== karToken || !(e.charIndex > 0)) return; lastB = performance.now(); show(sp.map[Math.min(sp.map.length - 1, e.charIndex)] || 0); };
     const done = () => {
       if (my !== karToken) return;
       const per = (performance.now() - t0) / total; if (from === 0 && per > 80 && per < 900) msPerChar = msPerChar * .5 + per * .5;
