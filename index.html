@@ -138,6 +138,7 @@
   <h1>📝 考卷小幫手 <span class="ver" id="ver"></span></h1>
   <div class="sub">載入考卷，一題一題念給你聽，答完看說明 ✨</div>
   <button class="big-btn" id="goImport">➕ 載入新考卷<small>貼上文字，或選一個文字檔</small></button>
+  <div id="cloudBox" style="display:flex;flex-direction:column;gap:12px;align-items:center;width:100%"></div>
   <div id="plist" style="display:flex;flex-direction:column;gap:12px;align-items:center;width:100%"></div>
 </div>
 
@@ -233,7 +234,7 @@ D. 早上
 
 <script src="parse.js"></script>
 <script>
-const APP_VER = 'v2026.11.07-3';
+const APP_VER = 'v2026.11.07-4';
 document.getElementById('ver').textContent = APP_VER;
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -358,6 +359,7 @@ document.addEventListener('click', e => {
 
 // ---------- 首頁 ----------
 function renderHome() {
+  renderCloud();
   const ps = papers();
   $('plist').innerHTML = ps.length ? ps.map(p => {
     const g = progOf(p.id);
@@ -365,6 +367,39 @@ function renderHome() {
       <button class="pill" data-open="${p.id}">開啟</button><button class="pill" data-del="${p.id}" style="font-size:16px">🗑</button></div>`;
   }).join('') : '<div class="sub">還沒有考卷。按上面的「載入新考卷」開始吧！</div>';
 }
+// ---------- 雲端考卷（只有放在私人網站、要登入的版本才有；公開版找不到清單就什麼都不顯示）----------
+let cloudList = [];
+async function loadCloud() {
+  try {
+    const r = await fetch('papers/index.json', { cache: 'no-cache', credentials: 'same-origin' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (Array.isArray(j)) cloudList = j.filter(c => c && c.file && c.title);
+  } catch (_) { /* 沒有雲端清單 */ }
+  renderCloud();
+}
+function renderCloud() {
+  const box = $('cloudBox'); if (!box) return;
+  const have = new Set(papers().map(p => p.cid).filter(Boolean));
+  box.innerHTML = cloudList.length ? '<div class="sub">☁️ 雲端考卷</div>' + cloudList.map(c =>
+    `<div class="pcard"><div class="info"><b>${esc(c.title)}</b><div>${esc(c.note || '')}${have.has(c.file) ? '　✅ 已載入' : ''}</div></div>
+      <button class="pill" data-cloud="${esc(c.file)}">${have.has(c.file) ? '開啟' : '☁️ 載入'}</button></div>`).join('') : '';
+}
+$('cloudBox').onclick = async e => {
+  const b = e.target.closest('[data-cloud]'); if (!b) return;
+  const file = b.dataset.cloud, have = papers().find(p => p.cid === file);
+  if (have) { paper = have; show('hub'); return; }
+  b.disabled = true; b.textContent = '載入中…';
+  try {
+    const r = await fetch('papers/' + encodeURIComponent(file), { cache: 'no-cache', credentials: 'same-origin' });
+    if (!r.ok) throw new Error(r.status);
+    const parsed = parsePaper(await r.text());
+    if (!parsed.qs.length) throw new Error('empty');
+    const p = { id: 'p' + Date.now(), cid: file, title: parsed.title, subject: parsed.subject, qs: parsed.qs, created: Date.now() };
+    store.set('ppPapers', [p, ...papers()]); chime(); paper = p; show('hub');
+  } catch (_) { b.disabled = false; b.textContent = '☁️ 載入'; alert('載入失敗，請確認有登入、網路正常，再按一次。'); }
+};
+loadCloud();
 $('plist').onclick = e => {
   const o = e.target.closest('[data-open]'), d = e.target.closest('[data-del]');
   if (o) { paper = papers().find(p => p.id === o.dataset.open); show('hub'); }
