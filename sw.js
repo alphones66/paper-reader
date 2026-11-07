@@ -1,4 +1,4 @@
-const CACHE = 'paper-pages-v5';
+const CACHE = 'paper-pages-v6';
 const FILES = ['./', 'index.html', 'parse.js', 'pp-manifest.json', 'pp-icon2-180.png', 'pp-icon2-192.png', 'pp-icon2-512.png'];
 
 self.addEventListener('install', event => {

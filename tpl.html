@@ -161,9 +161,66 @@ D. 早上
 
 <script src="parse.js"></script>
 <script>
-const APP_VER = 'v2026.11.07-5';
+const APP_VER = 'v2026.11.07-6';
 document.getElementById('ver').textContent = APP_VER;
 {{JS}}
+
+// ---------- 朗讀前的轉換：小數點、單位、數學符號要照人話念 ----------
+// （原本的 spoken() 會把標點通通拿掉，連小數點也拿掉，850.0 就變成 8500；mm、cm 也會被念成英文字母）
+const UNIT = { mm: '毫米', cm: '公分', km: '公里', kg: '公斤', mL: '毫升', ml: '毫升', 'μm': '微米', nm: '奈米', m: '公尺', g: '公克', L: '公升' };
+const SPK = [
+  [/g\/cm³/y, () => '公克每立方公分'],
+  [/(cm|m)([²³])/y, m => (m[2] === '²' ? '平方' : '立方') + UNIT[m[1]]],
+  [/(\d+(?:\.\d+)?)\s*%/y, m => '百分之' + m[1]],
+  [/(\d+)\s*[:：]\s*(\d+)/y, m => m[1] + '比' + m[2]],
+  [/(\d+|[A-Za-z])\/(\d+|[A-Za-z])/y, m => m[2] + '分之' + m[1]],
+  [/\d+(?:\.\d+)?/y, m => m[0]],
+  [/(mm|cm|km|kg|mL|ml|μm|nm)(?![A-Za-z])/y, m => UNIT[m[1]], 'unit'],
+  [/(m|g|L)(?![A-Za-z])/y, m => UNIT[m[1]], 'unit1'],
+  [/[℃°]C?/y, () => '度'],
+  [/√/y, () => '根號'], [/²/y, () => '平方'], [/³/y, () => '立方'],
+  [/[＝=]/y, () => '等於'], [/≥/y, () => '大於等於'], [/≤/y, () => '小於等於'], [/[＞>]/y, () => '大於'], [/[＜<]/y, () => '小於'],
+  [/×/y, () => '乘'], [/÷/y, () => '除以'], [/[＋+]/y, () => '加'], [/±/y, () => '正負'],
+  [/[−－]/y, (m, prev, prevNs) => /[\d)A-Za-z²³]/.test(prevNs) ? '減' : '負'],
+  [/[~～]/y, (m, prev, prevNs) => /\d/.test(prevNs) ? '到' : ''],
+  [/[①②③④⑤⑥⑦⑧⑨]/y, m => '一二三四五六七八九'['①②③④⑤⑥⑦⑧⑨'.indexOf(m[0])]],
+  [/[|｜／/]/y, () => ''],
+];
+// 回傳要唸的字，以及「每個唸出來的字」對應字幕的第幾個字（卡拉 OK 掃字用）
+function spoken(t) {
+  const out = [], map = []; let p = 0, di = 0, prev = '', prevNs = '';
+  while (p < t.length) {
+    let hit = null;
+    for (const [re, fn, kind] of SPK) {
+      if (kind === 'unit' && /[A-Za-z]/.test(prev)) continue;
+      if (kind === 'unit1' && !/\d/.test(prevNs)) continue;
+      re.lastIndex = p; const m = re.exec(t);
+      if (m) { hit = [m, fn(m, prev, prevNs)]; break; }
+    }
+    if (hit) {
+      const [m, str] = hit, len = Array.from(m[0]).length;
+      Array.from(str).forEach((c, k) => { out.push(c); map.push(di + Math.min(k, len - 1)); });
+      p += m[0].length; di += len; prev = m[0].slice(-1); if (!/\s/.test(prev)) prevNs = prev;
+      continue;
+    }
+    const c = String.fromCodePoint(t.codePointAt(p));
+    if (!PUNC.test(c)) { out.push(c); map.push(di); }
+    p += c.length; di++; prev = c; if (!/\s/.test(c)) prevNs = c;
+  }
+  return { out: out.join(''), map };
+}
+
+// ---------- iPad 的語音：念完馬上 cancel()，下一次 speak() 會被吞掉 ----------
+// 只有真的還在念的時候才 cancel；cancel 之後等一下再開始念
+const ttsBusy = () => { try { return speechSynthesis.speaking || speechSynthesis.pending; } catch (_) { return false; } };
+karStop = function () { karToken++; clearInterval(karTimer); karTimer = null; if ('speechSynthesis' in window && ttsBusy()) speechSynthesis.cancel(); };
+const _karSay = karSay;
+karSay = function (text, box, onEnd, from = 0) {
+  const wasBusy = ttsBusy(); karStop();
+  const my = karToken;
+  const go = () => { if (my !== karToken) return; try { speechSynthesis.resume(); } catch (_) {} _karSay(text, box, onEnd, from); };
+  if (wasBusy) setTimeout(go, 200); else go();
+};
 
 // ---------- 讀出來：按一下開始，再按暫停，再按從那一句接著讀 ----------
 let rd = { btn: null, st: '', pos: 0 };
