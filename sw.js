@@ -1,4 +1,4 @@
-const CACHE = 'paper-pages-v8';
+const CACHE = 'paper-pages-v9';
 const FILES = ['./', 'index.html', 'parse.js', 'pp-manifest.json', 'pp-icon2-180.png', 'pp-icon2-192.png', 'pp-icon2-512.png'];
 
 self.addEventListener('install', event => {
@@ -17,7 +17,7 @@ self.addEventListener('activate', event => {
 // 先向伺服器確認有沒有新版，連不上網才用存起來的
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  if (/\.(mp3|m4a|mp4)$/i.test(new URL(event.request.url).pathname)) return;   // 音檔交給瀏覽器（拖曳進度要用 Range 請求）
+  if (/\/papers\//.test(new URL(event.request.url).pathname) || /\.(mp3|m4a|mp4)$/i.test(new URL(event.request.url).pathname)) return;   // 音檔交給瀏覽器（拖曳進度要用 Range 請求）
   event.respondWith(
     fetch(event.request, { cache: 'no-cache' }).then(res => {
       if (res.ok && new URL(event.request.url).origin === location.origin) {

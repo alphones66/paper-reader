@@ -21,7 +21,10 @@
     .say { border: 0; background: var(--orange); color: #fff; border-radius: 999px; min-width: 48px; height: 48px; font-size: 22px; flex: none; padding: 0 12px; }
     .hz { font-size: clamp(22px, 3.6vw, 32px); line-height: 1.8; font-weight: 600; text-align: left; }
     .audbar { width: min(900px, 96vw); background: #fff; border: 5px solid #5aa9e6; border-radius: 22px; padding: 8px 14px; display: flex; align-items: center; gap: 10px; font-weight: bold; color: #1f6fb5; font-size: 20px; }
+    .audbar { flex-wrap: wrap; }
     .audbar audio { flex: 1; min-width: 0; height: 44px; }
+    .audst { flex-basis: 100%; font-size: 16px; font-weight: normal; color: #7a5a3a; }
+    .audst button { font-size: 16px; margin-left: 8px; border: 3px solid #5aa9e6; background: #fff; color: #1f6fb5; border-radius: 999px; padding: 2px 12px; font-weight: bold; }
     .hz .c { border-radius: 6px; transition: color .12s, background .12s; }
     .hz .c.done { color: var(--red); }
     .hz .c.now { color: #fff; background: var(--red); }
@@ -126,7 +129,7 @@ D. 早上
 <div class="screen" id="quiz">
   <button class="round-btn" id="qBack">⬅️</button>
   <div class="bar"><i id="qBar"></i></div>
-  <div class="audbar" id="audBar" hidden><span>🎧 聽力</span><audio id="aud" controls preload="metadata" playsinline></audio></div>
+  <div class="audbar" id="audBar" hidden><span>🎧 聽力</span><audio id="aud" controls preload="auto" playsinline></audio><div id="audSt" class="audst"></div></div>
   <div class="card">
     <div class="qhead"><span class="qno" id="qNo"></span><span class="sub" id="qCount"></span></div>
     <div class="qrow"><button class="say" id="qSay">🔊</button><div class="hz kbox" id="qText"></div></div>
@@ -164,7 +167,7 @@ D. 早上
 
 <script src="parse.js"></script>
 <script>
-const APP_VER = 'v2026.11.07-8';
+const APP_VER = 'v2026.11.07-9';
 document.getElementById('ver').textContent = APP_VER;
 {{JS}}
 
@@ -392,11 +395,37 @@ $('hbAll').onclick = () => { renderReview(); show('review'); };
 let Q = [], qi = 0, miss = 0, firstTry = 0, wrongSet = new Set(), answered = false, partial = false;
 function startQuiz(list, isPartial) { Q = list; qi = 0; firstTry = 0; wrongSet = new Set(); partial = isPartial; show('quiz'); showQ(); }
 const ansLabel = q => q.ans ? (q.ans.length > 1 ? q.ans.split('').join('、') : q.ans) : '';
+// 音檔：先整個下載（帶著登入資訊）再交給播放器，比直接給網址穩，也會存在這台裝置裡，下次不用再下載
+async function loadAudio(file) {
+  const au = $('aud'), st = $('audSt');
+  if (au.dataset.f === file && au.getAttribute('src')) return;
+  au.dataset.f = file; st.textContent = '下載聽力音檔中…（約 6 MB，請稍等）';
+  const url = 'papers/' + encodeURIComponent(file);
+  try {
+    let res = null, c = null;
+    try { c = await caches.open('paper-audio-v1'); res = await c.match(url); } catch (_) { /* 沒有快取也沒關係 */ }
+    if (!res) {
+      const r = await fetch(url, { credentials: 'same-origin', cache: 'no-cache' });
+      if (!r.ok) throw new Error('伺服器回應 ' + r.status);
+      const buf = await r.arrayBuffer();
+      if (buf.byteLength < 100000) throw new Error('檔案不完整（可能登入過期，請重新登入）');
+      res = new Response(buf, { headers: { 'Content-Type': 'audio/mpeg' } });
+      try { if (c) await c.put(url, res.clone()); } catch (_) { /* 存不進去就算了 */ }
+    }
+    const blob = new Blob([await res.arrayBuffer()], { type: 'audio/mpeg' });
+    if (au.dataset.f !== file) return;
+    au.src = URL.createObjectURL(blob); st.textContent = '';
+  } catch (e) {
+    au.dataset.f = ''; au.removeAttribute('src');
+    st.innerHTML = '音檔載入失敗：' + esc(e.message || e) + ' <button type="button" id="audRetry">重試</button>';
+  }
+}
+document.addEventListener('click', e => { if (e.target.closest('#audRetry')) { const q = Q[qi]; if (paper && paper.audio) loadAudio(paper.audio); } });
 function showQ() {
   const q = Q[qi]; miss = 0; answered = false; rdReset();
   const au = $('aud'), hasAud = !!(paper.audio && q.listen);
   $('audBar').hidden = !hasAud;
-  if (hasAud) { if (au.dataset.f !== paper.audio) { au.dataset.f = paper.audio; au.src = 'papers/' + encodeURIComponent(paper.audio); } }
+  if (hasAud) loadAudio(paper.audio);
   else { try { au.pause(); } catch (_) {} }
   $('qBar').style.width = (qi / Q.length * 100) + '%';
   $('qNo').textContent = '第 ' + q.n + ' 題'; $('qCount').textContent = `（${qi + 1} / ${Q.length}）`;
