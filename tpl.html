@@ -168,7 +168,7 @@ D. 早上
 
 <script src="parse.js"></script>
 <script>
-const APP_VER = 'v2026.11.07-10';
+const APP_VER = 'v2026.11.08-1';
 document.getElementById('ver').textContent = APP_VER;
 {{JS}}
 
@@ -232,6 +232,25 @@ karSay = function (text, box, onEnd, from = 0) {
   const go = () => { if (my !== karToken) return; try { speechSynthesis.resume(); } catch (_) {} _karSay(text, box, onEnd, from); };
   if (wasBusy) setTimeout(go, 200); else go();
 };
+// iPad Safari：語音物件沒人拿著就會被回收，念到一半「結束」事件不來，後面的句子就斷了。
+// 這裡把正在念的物件留住，再加逾時保險（太久沒結束就當作念完，換下一句）
+const ttsKeep = new Set();
+if ('speechSynthesis' in window) {
+  const _speak = speechSynthesis.speak.bind(speechSynthesis);
+  speechSynthesis.speak = function (u) {
+    ttsKeep.add(u);
+    let done = false;
+    const wrap = fn => e => { if (done) return; done = true; clearTimeout(u._wd); ttsKeep.delete(u); if (fn) fn(e); };
+    const oe = wrap(u.onend), oer = wrap(u.onerror);
+    u.onend = oe; u.onerror = oer;
+    u._wd = setTimeout(() => {
+      if (done) return;
+      try { speechSynthesis.cancel(); } catch (_) {}
+      setTimeout(() => oe(), 250);
+    }, Array.from(u.text || '').length * 800 + 5000);
+    _speak(u);
+  };
+}
 
 // ---------- 讀出來：按一下開始，再按暫停，再按從那一句接著讀 ----------
 let rd = { btn: null, st: '', pos: 0 };
